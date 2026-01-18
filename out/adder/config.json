@@ -11,8 +11,8 @@
         "n_layer": null,
         "n_head": null,
         "n_embd": null,
-        "vocab_size": null,
-        "block_size": null,
+        "vocab_size": 10,
+        "block_size": 6,
         "embd_pdrop": 0.1,
         "resid_pdrop": 0.1,
         "attn_pdrop": 0.1

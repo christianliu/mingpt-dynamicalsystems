@@ -125,8 +125,6 @@ if __name__ == '__main__':
     # get default config and overrides from the command line, if any
     config = get_config()
     config.merge_from_args(sys.argv[1:])
-    print(config)
-    setup_logging(config)
     set_seed(config.system.seed)
 
     # construct train and test datasets
@@ -136,6 +134,8 @@ if __name__ == '__main__':
     # construct the model
     config.model.vocab_size = train_dataset.get_vocab_size()
     config.model.block_size = train_dataset.get_block_size()
+    print(config)
+    setup_logging(config)
     model = GPT(config.model)
 
     # construct the trainer object

@@ -28,6 +28,9 @@ def setup_logging(config):
     with open(os.path.join(work_dir, 'config.json'), 'w') as f:
         f.write(json.dumps(config.to_dict(), indent=4))
 
+
+
+
 class CfgNode:
     """ a lightweight configuration class inspired by yacs """
     # TODO: convert to subclass from a dict like in yacs?

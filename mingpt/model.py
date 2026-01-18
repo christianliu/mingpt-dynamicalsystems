@@ -6,6 +6,7 @@ https://github.com/huggingface/transformers/blob/main/src/transformers/models/gp
 """
 
 import math
+from collections import namedtuple
 
 import torch
 import torch.nn as nn
@@ -14,6 +15,11 @@ from torch.nn import functional as F
 from mingpt.utils import CfgNode as CN
 
 # -----------------------------------------------------------------------------
+
+OutputWithAtt = namedtuple("OutputWithAtt", ["output", "att_scores"])
+OutputWithAtt.__doc__ = """
+    Container for outputs when a module optionally returns attention scores.
+    """
 
 class NewGELU(nn.Module):
     """
@@ -40,28 +46,29 @@ class CausalSelfAttention(nn.Module):
         self.resid_dropout = nn.Dropout(config.resid_pdrop)
         # causal mask to ensure that attention is only applied to the left in the input sequence
         self.register_buffer("bias", torch.tril(torch.ones(config.block_size, config.block_size))
-                                     .view(1, 1, config.block_size, config.block_size))
+                                     .reshape(1, 1, config.block_size, config.block_size))
         
-    def forward(self, x):
+    def forward(self, x, output_att_scores = False):
         B, T, C = x.size() # batch size, sequence length, embedding dimensionality (n_embd)
 
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
         q, k ,v  = self.c_attn(x).split(self.n_embd, dim=2)
-        k = k.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
-        q = q.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
-        v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
+        k = k.reshape(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
+        q = q.reshape(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
+        v = v.reshape(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
 
         # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
         att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
         att = att.masked_fill(self.bias[:,:,:T,:T] == 0, float('-inf'))
         att = F.softmax(att, dim=-1)
+        att_out = att if output_att_scores else None
         att = self.attn_dropout(att)
         y = att @ v # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
-        y = y.transpose(1, 2).contiguous().view(B, T, C) # re-assemble all head outputs side by side
+        y = y.transpose(1, 2).reshape(B, T, C) # re-assemble all head outputs side by side
 
         # output projection
         y = self.resid_dropout(self.c_proj(y))
-        return y
+        return OutputWithAtt(y, att_out)
 
 class Block(nn.Module):
     """ an unassuming Transformer block """
@@ -79,10 +86,11 @@ class Block(nn.Module):
         m = self.mlp
         self.mlpf = lambda x: m.dropout(m.c_proj(m.act(m.c_fc(x)))) # MLP forward
 
-    def forward(self, x):
-        x = x + self.attn(self.ln_1(x))
+    def forward(self, x, output_att_scores = False):
+        y, att_out = self.attn(self.ln_1(x), output_att_scores)
+        x = x + y
         x = x + self.mlpf(self.ln_2(x))
-        return x
+        return OutputWithAtt(x, att_out)
 
 class GPT(nn.Module):
     """ GPT Language Model """
@@ -249,7 +257,7 @@ class GPT(nn.Module):
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
         return optimizer
 
-    def forward(self, idx, targets=None):
+    def forward(self, idx, targets=None, output_att_scores = False):
         device = idx.device
         b, t = idx.size()
         assert t <= self.block_size, f"Cannot forward sequence of length {t}, block size is only {self.block_size}"
@@ -259,30 +267,40 @@ class GPT(nn.Module):
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
         pos_emb = self.transformer.wpe(pos) # position embeddings of shape (1, t, n_embd)
         x = self.transformer.drop(tok_emb + pos_emb)
+        att_outs = [] if output_att_scores else None
         for block in self.transformer.h:
-            x = block(x)
+            x, att_out = block(x, output_att_scores)
+            if output_att_scores:
+                att_outs.append(att_out)
+        if output_att_scores:
+            att_outs = torch.stack(att_outs, dim=1)            
         x = self.transformer.ln_f(x)
         logits = self.lm_head(x)
-
+            
         # if we are given some desired targets also calculate the loss
         loss = None
         if targets is not None:
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+            loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1), ignore_index=-1)
 
-        return logits, loss
+        return OutputWithAtt(logits, att_outs), loss
 
     @torch.no_grad()
-    def generate(self, idx, max_new_tokens, temperature=1.0, do_sample=False, top_k=None):
+    def generate(self, idx, max_new_tokens, temperature=1.0, do_sample=False, top_k=None, output_att_scores = False):
         """
         Take a conditioning sequence of indices idx (LongTensor of shape (b,t)) and complete
         the sequence max_new_tokens times, feeding the predictions back into the model each time.
         Most likely you'll want to make sure to be in model.eval() mode of operation for this.
+        Gets attention scores for final token only
         """
-        for _ in range(max_new_tokens):
+        att_out = None
+        for i in range(max_new_tokens):
             # if the sequence context is growing too long we must crop it at block_size
             idx_cond = idx if idx.size(1) <= self.block_size else idx[:, -self.block_size:]
             # forward the model to get the logits for the index in the sequence
-            logits, _ = self(idx_cond)
+            if output_att_scores and i == max_new_tokens - 1:
+                logits, att_out = self(idx_cond, output_att_scores = True)[0]
+            else:
+                logits = self(idx_cond)[0].output
             # pluck the logits at the final step and scale by desired temperature
             logits = logits[:, -1, :] / temperature
             # optionally crop the logits to only the top k options
@@ -299,4 +317,4 @@ class GPT(nn.Module):
             # append sampled index to the running sequence and continue
             idx = torch.cat((idx, idx_next), dim=1)
 
-        return idx
+        return OutputWithAtt(idx, att_out) if att_out else idx
