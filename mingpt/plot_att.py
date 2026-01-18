@@ -85,5 +85,8 @@ def plot_att_from_model(model, input):
     plot_att(att_scores, tokens=input)
 
 if __name__ == '__main__':
-    adder_model = load_gpt_from_dir("out/adder")
-    plot_att_from_model(adder_model, torch.tensor([2,4,0,0,4]))
+    # adder_model = load_gpt_from_dir("out/adder")
+    # plot_att_from_model(adder_model, torch.tensor([2,4,6,8,2]))
+
+    char_model = load_gpt_from_dir("out/chargpt")
+    plot_att_from_model(char_model, torch.tensor([char_model.stoi[s] for s in "O God, O God! "]))

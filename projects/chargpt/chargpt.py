@@ -4,6 +4,7 @@ Trains a character-level language model.
 
 import os
 import sys
+import json
 
 import torch
 from torch.utils.data import Dataset
@@ -88,17 +89,21 @@ if __name__ == '__main__':
     # get default config and overrides from the command line, if any
     config = get_config()
     config.merge_from_args(sys.argv[1:])
-    print(config)
-    setup_logging(config)
     set_seed(config.system.seed)
 
     # construct the training dataset
     text = open(os.path.join(config.system.work_dir, "input.txt"), 'r').read() # don't worry we won't run out of file handles
     train_dataset = CharDataset(config.data, text)
+    with open(os.path.join(config.system.work_dir, "stoi.json"), 'w') as f:
+        json.dump(train_dataset.stoi, f)
+    with open(os.path.join(config.system.work_dir, "itos.json"), 'w') as f:
+        json.dump(train_dataset.itos, f)
 
     # construct the model
     config.model.vocab_size = train_dataset.get_vocab_size()
     config.model.block_size = train_dataset.get_block_size()
+    print(config)
+    setup_logging(config)
     model = GPT(config.model)
 
     # construct the trainer object

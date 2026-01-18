@@ -317,4 +317,4 @@ class GPT(nn.Module):
             # append sampled index to the running sequence and continue
             idx = torch.cat((idx, idx_next), dim=1)
 
-        return OutputWithAtt(idx, att_out) if att_out else idx
+        return OutputWithAtt(idx, att_out) if output_att_scores else idx
