@@ -78,15 +78,24 @@ def load_gpt_from_dir(work_dir, map_location="cpu"):
     model.eval()
     return model
 
-def plot_att_from_model(model, input):
+def plot_att_from_adder_model(model, input):
     model.eval()
-    idx, att_scores = model.generate(input.unsqueeze(0), 1, output_att_scores = True)
+    idx, att_scores = model.generate(torch.tensor(input).unsqueeze(0), 1, output_att_scores = True)
     print(idx.squeeze(0))
+    plot_att(att_scores, tokens=input)
+
+def plot_att_from_char_model(model, input, stoi, itos):
+    model.eval()
+    idx, att_scores = model.generate(torch.tensor([stoi[s] for s in input]).unsqueeze(0), 1, output_att_scores = True)
+    print([itos[int(i)] for i in idx.squeeze(0)])
     plot_att(att_scores, tokens=input)
 
 if __name__ == '__main__':
     # adder_model = load_gpt_from_dir("out/adder")
-    # plot_att_from_model(adder_model, torch.tensor([2,4,6,8,2]))
+    # plot_att_from_adder_model(adder_model, [2,4,6,8,2])
 
     char_model = load_gpt_from_dir("out/chargpt")
-    plot_att_from_model(char_model, torch.tensor([char_model.stoi[s] for s in "O God, O God! "]))
+    with open("out/chargpt/stoi.json") as f:
+        stoi = json.load(f)
+        itos = {i: ch for ch, i in stoi.items()}
+    plot_att_from_char_model(char_model, "O God, O God! ", stoi, itos)
