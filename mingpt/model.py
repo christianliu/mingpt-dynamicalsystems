@@ -280,9 +280,10 @@ class GPT(nn.Module):
         # if we are given some desired targets also calculate the loss
         loss = None
         if targets is not None:
+            # -1 means infer dim b*t, logits.size(-1) is vocab_size
             loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1), ignore_index=-1)
 
-        return OutputWithAtt(logits, att_outs), loss
+        return (OutputWithAtt(logits, att_outs), loss) if output_att_scores else (logits, loss)
 
     @torch.no_grad()
     def generate(self, idx, max_new_tokens, temperature=1.0, do_sample=False, top_k=None, output_att_scores = False):

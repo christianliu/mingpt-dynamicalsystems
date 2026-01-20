@@ -151,14 +151,11 @@ if __name__ == '__main__':
         loader = DataLoader(dataset, batch_size=100, num_workers=0, drop_last=False)
         for b, (x, y) in enumerate(loader):
             x = x.to(trainer.device)
-            # isolate the first two digits of the input sequence alone
+            # pick out the two inputs, across all batches
             d1d2 = x[:, :ndigit*2]
-            # let the model sample the rest of the sequence
-            d1d2d3 = model.generate(d1d2, ndigit+1, do_sample=False) # using greedy argmax, not sampling
-            # isolate the last digit of the sampled sequence
-            d3 = d1d2d3[:, -(ndigit+1):]
-            d3 = d3.flip(1) # reverse the digits to their "normal" order
-            # decode the integers from individual digits
+            # model returns d1d2d3 by argmax; we pick out the sum and then correct the order of the digits
+            d3 = model.generate(d1d2, ndigit+1, do_sample=False)[:, -(ndigit+1):].flip(1)
+            # convert list of digits into ints
             d1i = (d1d2[:,:ndigit] * factors[:,1:]).sum(1)
             d2i = (d1d2[:,ndigit:ndigit*2] * factors[:,1:]).sum(1)
             d3i_pred = (d3 * factors).sum(1)
