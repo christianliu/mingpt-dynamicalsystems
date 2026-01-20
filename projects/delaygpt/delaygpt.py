@@ -98,7 +98,7 @@ if __name__ == '__main__':
     set_seed(config.system.seed)
 
     # construct the training dataset
-    train_n = int(1e5)
+    train_n = int(1e4)
     train_params = [
         {"r": 2.26, "delay": 1, "x_init": [0.1, 0.1]},
         {"r": 2.26, "delay": 1, "x_init": [0.1, 0.15]}
