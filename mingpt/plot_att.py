@@ -94,8 +94,15 @@ if __name__ == '__main__':
     # adder_model = load_gpt_from_dir("out/adder")
     # plot_att_from_adder_model(adder_model, [2,4,6,8,2])
 
-    char_model = load_gpt_from_dir("out/chargpt")
-    with open("out/chargpt/stoi.json") as f:
-        stoi = json.load(f)
-        itos = {i: ch for ch, i in stoi.items()}
-    plot_att_from_char_model(char_model, "O God, O God! ", stoi, itos)
+    # char_model = load_gpt_from_dir("out/chargpt")
+    # with open("out/chargpt/stoi.json") as f:
+    #     stoi = json.load(f)
+    #     itos = {i: ch for ch, i in stoi.items()}
+    # plot_att_from_char_model(char_model, "O God, O God! ", stoi, itos)
+
+    delay_model = load_gpt_from_dir("out/delaygpt")
+    train_ex = [0.01435208, 0.01408787, 0.03138163, 0.06992334, 0.15306761, 0.32174402,
+                0.61583967, 0.94399509, 0.81957874, 0.10373498]
+    test_ex = [0.98396119, 0.46809989, 0.01696755, 0.0203966,  0.04531416, 0.10032119,
+               0.216452,  0.44010625, 0.77934828, 0.98615604]
+    plot_att_from_adder_model(delay_model, torch.tensor(train_ex*10000, dtype=torch.long))

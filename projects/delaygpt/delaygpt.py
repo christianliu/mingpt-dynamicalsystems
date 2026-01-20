@@ -27,7 +27,7 @@ def get_config():
     # system
     C.system = CN()
     C.system.seed = 3407
-    C.system.work_dir = './out/chargpt'
+    C.system.work_dir = './out/delaygpt'
 
     # data
     C.data = DelayDataset.get_default_config()
@@ -63,7 +63,7 @@ class DelayDataset(Dataset):
         # treating inputs as discrete
         chars = np.sort(np.unique(np.concatenate(data))) # data is a list of np.arrays
         data_size, vocab_size = len(data), len(chars)
-        print('data has %d numbers, %d unique.' % (data_size, vocab_size))
+        print('data has %d numbers, %d unique.' % (data_size, vocab_size)) # wrong data_size, gives number of paths
         self.vocab_size = vocab_size
         
         self.window_counts = [len(traj) - self.block_size for traj in data]
@@ -84,8 +84,8 @@ class DelayDataset(Dataset):
         local_idx = idx - self.offsets[traj_id]
         chunk = self.data[traj_id][local_idx : local_idx + self.block_size + 1]
         # return as tensors
-        x = torch.tensor(chunk[:-1], dtype=torch.long)
-        y = torch.tensor(chunk[1:], dtype=torch.long)
+        x = torch.tensor(chunk[:-1]*10000, dtype=torch.long)
+        y = torch.tensor(chunk[1:]*10000, dtype=torch.long)
         return x, y
 
 # -----------------------------------------------------------------------------
@@ -132,6 +132,7 @@ if __name__ == '__main__':
         losses = []
         for b, (x, y) in enumerate(loader):
             x = x.to(trainer.device)
+            y = y.to(trainer.device)
             _, loss = model(x, y)
             losses.append(loss.item())
             if max_batches is not None and b + 1 >= max_batches:
@@ -142,7 +143,9 @@ if __name__ == '__main__':
         return avg_loss
 
     # iteration callback
+    top_score = 0
     def batch_end_callback(trainer):
+        global top_score
 
         if trainer.iter_num % 10 == 0:
             print(f"iter_dt {trainer.iter_dt * 1000:.2f}ms; iter {trainer.iter_num}: train loss {trainer.loss.item():.5f}")

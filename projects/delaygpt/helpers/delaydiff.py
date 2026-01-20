@@ -94,14 +94,19 @@ def plot_phase_space(xs, delayed_logistic_params, separate_subplots = True):
 
 
 if __name__ == '__main__':
-    n = int(1e5)
+    n = int(100)
     delayed_logistic_params = [
         {"r": 2.26, "delay": 1, "x_init": [0.1, 0.1]},
-        {"r": 2.2, "delay": 1, "x_init": [0.1, 0.1]},
+        {"r": 2.26, "delay": 1, "x_init": [0.1, 0.15]},
+        {"r": 2.26, "delay": 1, "x_init": [0.1, 0.2]}
+        # {"r": 2.2, "delay": 1, "x_init": [0.1, 0.1]},
         # {"r": 1.5, "delay": 1, "x_init": [0.1, 0.1]},
         # {"r": 1.5, "delay": 3, "x_init": [0.1, 0.1, .1, .1]}
     ]
     xs = delayed_logistic_mult(delayed_logistic_params, n)
     # plot_time_series(xs, delayed_logistic_params, False)
-    plot_phase_space(xs, delayed_logistic_params, True)
+    # plot_phase_space(xs, delayed_logistic_params, True)
+
+    print(xs[0])
+    print(xs[2])
 
