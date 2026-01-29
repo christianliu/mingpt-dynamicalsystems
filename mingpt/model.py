@@ -1,12 +1,11 @@
 """
-1) the official GPT-2 TensorFlow implementation released by OpenAI:
-https://github.com/openai/gpt-2/blob/master/src/model.py
-2) huggingface/transformers PyTorch implementation:
-https://github.com/huggingface/transformers/blob/main/src/transformers/models/gpt2/modeling_gpt2.py
+References:
+1) the official GPT-2 TensorFlow implementation released by OpenAI: https://github.com/openai/gpt-2/blob/master/src/model.py
+2) huggingface/transformers PyTorch implementation: https://github.com/huggingface/transformers/blob/main/src/transformers/models/gpt2/modeling_gpt2.py
 """
 
 import math
-from collections import namedtuple
+from typing import NamedTuple, Optional
 
 import torch
 import torch.nn as nn
@@ -16,21 +15,26 @@ from mingpt.utils import CfgNode as CN
 
 # -----------------------------------------------------------------------------
 
-OutputWithAtt = namedtuple("OutputWithAtt", ["output", "att_scores"])
-OutputWithAtt.__doc__ = """
-    Container for outputs when a module optionally returns attention scores.
+class BlockOutput(NamedTuple):
     """
+    Container for outputs when a module optionally returns attention scores
+    """
+    y: torch.Tensor
+    att_scores: Optional[torch.Tensor] = None
+    loss: Optional[torch.Tensor] = None
 
 class NewGELU(nn.Module):
     """
     Gaussian Error Linear Units (GELU) paper: https://arxiv.org/abs/1606.08415
+    Float -> Float
     """
     def forward(self, x):
         return 0.5 * x * (1.0 + torch.tanh(math.sqrt(2.0 / math.pi) * (x + 0.044715 * torch.pow(x, 3.0))))
 
 class CausalSelfAttention(nn.Module):
     """
-    Multi-head masked self-attention layer with a projection at the end, like torch.nn.MultiheadAttention
+    Multi-head masked self-attention layer with linear projection, like torch.nn.MultiheadAttention
+    Tensor -> BlockOutput, att_scores.shape = (B, nh, T, T)
     """
     def __init__(self, config):
         super().__init__()
@@ -48,7 +52,7 @@ class CausalSelfAttention(nn.Module):
         self.register_buffer("bias", torch.tril(torch.ones(config.block_size, config.block_size))
                                      .reshape(1, 1, config.block_size, config.block_size))
         
-    def forward(self, x, output_att_scores = False):
+    def forward(self, x, output_att_scores=False):
         B, T, C = x.size() # batch size, sequence length, embedding dimensionality (n_embd)
 
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
@@ -61,17 +65,20 @@ class CausalSelfAttention(nn.Module):
         att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
         att = att.masked_fill(self.bias[:,:,:T,:T] == 0, float('-inf'))
         att = F.softmax(att, dim=-1)
-        att_out = att if output_att_scores else None
+        att_scores = att if output_att_scores else None
         att = self.attn_dropout(att)
         y = att @ v # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
         y = y.transpose(1, 2).reshape(B, T, C) # re-assemble all head outputs side by side
 
         # output projection
         y = self.resid_dropout(self.c_proj(y))
-        return OutputWithAtt(y, att_out)
+        return BlockOutput(y, att_scores)
 
 class Block(nn.Module):
-    """ an unassuming Transformer block """
+    """
+    Transformer block combining self-attention, FFN, layer norm
+    Tensor -> BlockOutput, att_scores.shape = (B, nh, T, T)
+    """
     def __init__(self, config):
         super().__init__()
         self.ln_1 = nn.LayerNorm(config.n_embd)
@@ -86,14 +93,17 @@ class Block(nn.Module):
         m = self.mlp
         self.mlpf = lambda x: m.dropout(m.c_proj(m.act(m.c_fc(x)))) # MLP forward
 
-    def forward(self, x, output_att_scores = False):
-        y, att_out = self.attn(self.ln_1(x), output_att_scores)
-        x = x + y
+    def forward(self, x, output_att_scores=False):
+        output = self.attn(self.ln_1(x), output_att_scores)
+        x = x + output.y
         x = x + self.mlpf(self.ln_2(x))
-        return OutputWithAtt(x, att_out)
+        return BlockOutput(x, output.att_scores)
 
 class GPT(nn.Module):
-    """ GPT Language Model """
+    """
+    GPT Language Model
+    Tensor -> BlockOutput, att_scores.shape = (B, num_layers, nh, T, T)
+    """
 
     @staticmethod
     def get_default_config():
@@ -112,7 +122,7 @@ class GPT(nn.Module):
         C.attn_pdrop = 0.1
         return C
 
-    def __init__(self, config):
+    def __init__(self, config): # set config, make transformer, initialize weights, print # of params
         super().__init__()
         assert config.vocab_size is not None
         assert config.block_size is not None
@@ -257,7 +267,7 @@ class GPT(nn.Module):
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
         return optimizer
 
-    def forward(self, idx, targets=None, output_att_scores = False):
+    def forward(self, idx, targets=None, output_att_scores=False): # returns logits of next prediction
         device = idx.device
         b, t = idx.size()
         assert t <= self.block_size, f"Cannot forward sequence of length {t}, block size is only {self.block_size}"
@@ -267,13 +277,14 @@ class GPT(nn.Module):
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
         pos_emb = self.transformer.wpe(pos) # position embeddings of shape (1, t, n_embd)
         x = self.transformer.drop(tok_emb + pos_emb)
-        att_outs = [] if output_att_scores else None
+        att_scores_mult = [] if output_att_scores else None
         for block in self.transformer.h:
-            x, att_out = block(x, output_att_scores)
+            output = block(x, output_att_scores)
+            x = output.y
             if output_att_scores:
-                att_outs.append(att_out)
+                att_scores_mult.append(output.att_scores)
         if output_att_scores:
-            att_outs = torch.stack(att_outs, dim=1)            
+            att_scores_mult = torch.stack(att_scores_mult, dim=1)            
         x = self.transformer.ln_f(x)
         logits = self.lm_head(x)
             
@@ -283,25 +294,27 @@ class GPT(nn.Module):
             # -1 means infer dim b*t, logits.size(-1) is vocab_size
             loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1), ignore_index=-1)
 
-        return (OutputWithAtt(logits, att_outs), loss) if output_att_scores else (logits, loss)
+        return BlockOutput(logits, att_scores_mult, loss)
 
     @torch.no_grad()
-    def generate(self, idx, max_new_tokens, temperature=1.0, do_sample=False, top_k=None, output_att_scores = False):
+    def generate(self, idx, max_new_tokens, temperature=1.0, do_sample=False, top_k=None, output_att_scores=False):
         """
         Take a conditioning sequence of indices idx (LongTensor of shape (b,t)) and complete
         the sequence max_new_tokens times, feeding the predictions back into the model each time.
         Most likely you'll want to make sure to be in model.eval() mode of operation for this.
-        Gets attention scores for final token only
+        Returns attention scores for final token only
         """
-        att_out = None
+        att_scores = None
         for i in range(max_new_tokens):
             # if the sequence context is growing too long we must crop it at block_size
             idx_cond = idx if idx.size(1) <= self.block_size else idx[:, -self.block_size:]
             # forward the model to get the logits for the index in the sequence
             if output_att_scores and i == max_new_tokens - 1:
-                logits, att_out = self(idx_cond, output_att_scores = True)[0]
+                output = self(idx_cond, output_att_scores = True)
+                logits = output.y
+                att_scores = output.att_scores
             else:
-                logits = self(idx_cond)[0].output
+                logits = self(idx_cond).y
             # pluck the logits at the final step and scale by desired temperature
             logits = logits[:, -1, :] / temperature
             # optionally crop the logits to only the top k options
@@ -318,4 +331,4 @@ class GPT(nn.Module):
             # append sampled index to the running sequence and continue
             idx = torch.cat((idx, idx_next), dim=1)
 
-        return OutputWithAtt(idx, att_out) if output_att_scores else idx
+        return BlockOutput(idx, att_scores)

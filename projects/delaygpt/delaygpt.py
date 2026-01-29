@@ -1,5 +1,5 @@
 """
-Trains a character-level language model.
+Trains a difference equation predictive model.
 """
 
 import os

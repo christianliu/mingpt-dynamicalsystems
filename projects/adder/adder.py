@@ -154,7 +154,7 @@ if __name__ == '__main__':
             # pick out the two inputs, across all batches
             d1d2 = x[:, :ndigit*2]
             # model returns d1d2d3 by argmax; we pick out the sum and then correct the order of the digits
-            d3 = model.generate(d1d2, ndigit+1, do_sample=False)[:, -(ndigit+1):].flip(1)
+            d3 = model.generate(d1d2, ndigit+1, do_sample=False).y[:, -(ndigit+1):].flip(1)
             # convert list of digits into ints
             d1i = (d1d2[:,:ndigit] * factors[:,1:]).sum(1)
             d2i = (d1d2[:,ndigit:ndigit*2] * factors[:,1:]).sum(1)

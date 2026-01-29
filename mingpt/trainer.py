@@ -1,6 +1,6 @@
 """
-Simple training loop; Boilerplate that could apply to any arbitrary neural network,
-so nothing in this file really has anything to do with GPT specifically.
+Simple training loop for any neural network,
+nothing in this file really has anything to do with GPT specifically
 """
 
 import time
@@ -90,7 +90,9 @@ class Trainer:
             x, y = batch
 
             # forward the model
-            logits, self.loss = model(x, y)
+            output = model(x, y)
+            logits = output.y
+            self.loss = output.loss
 
             # backprop and update the parameters
             model.zero_grad(set_to_none=True)
