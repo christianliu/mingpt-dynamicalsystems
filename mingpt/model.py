@@ -126,12 +126,12 @@ class GPT(nn.Module):
         super().__init__()
         assert config.vocab_size is not None
         assert config.block_size is not None
-        
+        self.block_size = config.block_size
+
+        # set n_layer, n_head, n_embd
         type_given = config.model_type is not None
         params_given = all([config.n_layer is not None, config.n_head is not None, config.n_embd is not None])
         assert type_given ^ params_given # exactly one of these (XOR)
-        
-        self.block_size = config.block_size
         if type_given:
             # translate from model_type to detailed configuration
             config.merge_from_dict({
@@ -150,7 +150,7 @@ class GPT(nn.Module):
                 'gpt-mini':     dict(n_layer=6, n_head=6, n_embd=192),
                 'gpt-micro':    dict(n_layer=4, n_head=4, n_embd=128),
                 'gpt-nano':     dict(n_layer=3, n_head=3, n_embd=48),
-            }[config.model_type])
+            }[config.model_type]) #inputs the nested dict of 3 params to merge_from_dict
 
         self.transformer = nn.ModuleDict(dict(
             wte = nn.Embedding(config.vocab_size, config.n_embd), # token embedding
@@ -267,6 +267,7 @@ class GPT(nn.Module):
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
         return optimizer
 
+    # targets of shape (B, H)
     def forward(self, idx, targets=None, output_att_scores=False): # returns logits of next prediction
         device = idx.device
         b, t = idx.size()
@@ -291,7 +292,9 @@ class GPT(nn.Module):
         # if we are given some desired targets also calculate the loss
         loss = None
         if targets is not None:
-            # -1 means infer dim b*t, logits.size(-1) is vocab_size
+            # -1 means infer dim b*t, based on being given just this one position and having to collapse multiple dim into it
+            # logits.size(-1) is vocab_size
+            # ignore target value of -1 when calculating loss
             loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1), ignore_index=-1)
 
         return BlockOutput(logits, att_scores_mult, loss)
@@ -311,12 +314,11 @@ class GPT(nn.Module):
             # forward the model to get the logits for the index in the sequence
             if output_att_scores and i == max_new_tokens - 1:
                 output = self(idx_cond, output_att_scores = True)
-                logits = output.y
                 att_scores = output.att_scores
             else:
-                logits = self(idx_cond).y
+                output = self(idx_cond)
             # pluck the logits at the final step and scale by desired temperature
-            logits = logits[:, -1, :] / temperature
+            logits = output.y[:, -1, :] / temperature
             # optionally crop the logits to only the top k options
             if top_k is not None:
                 v, _ = torch.topk(logits, top_k)
