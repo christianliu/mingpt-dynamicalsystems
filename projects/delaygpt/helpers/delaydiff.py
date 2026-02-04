@@ -3,13 +3,11 @@ import matplotlib.pyplot as plt
 
 # plt.rcParams['figure.figsize'] = [8, 8]
 # plt.rcParams.update({'font.size': 18})
-separate_subplots = True
 
 def delayed_logistic(delay: int, r: float, x_init: list[float], n: int):
     """
-    Returns length n sequence by generating element i from elements i-1 and i-1-delay and param r: 
+    List[Float] of length delay + 1 (initial conditions) -> List[Float] of length n (path)
     x_{i+1} = r * x_i * (1-x_{i-delay})
-    Need delay+1 many initial conditions
     Smaller delay less chaotic, larger delay goes to infinity
     """
     delay = int(delay)
@@ -19,78 +17,88 @@ def delayed_logistic(delay: int, r: float, x_init: list[float], n: int):
         return x_init[:n]
     
     x = np.zeros(n)
-    x[: delay+1] = x_init
-    for i in range(delay, n - 1):
-        x[i + 1] = r * x[i] * (1 - x[i - delay])
+    x[:delay+1] = x_init
+    for i in range(delay, n-1): # for i = delay, ..., n-2, produce next value
+        x[i+1] = r * x[i] * (1 - x[i-delay])
     return x
 
 def delayed_logistic_mult(delayed_logistic_params, n: int):
     """
-    Applies delayed_logistic to several sets of params at once, returns trajectories in (num_traj, n) array
+    List[Dict{delay:, r:, x_init:}] -> np.array of size (num_traj, n)
     """
     num_traj = len(delayed_logistic_params)
-    xs = np.zeros((num_traj, n))
-    for i, par in enumerate(delayed_logistic_params):
-        xs[i] = delayed_logistic(par["delay"], par["r"], par["x_init"], n)
-    return xs
+    trajs = np.zeros((num_traj, n))
+    for i, param in enumerate(delayed_logistic_params):
+        trajs[i] = delayed_logistic(param["delay"], param["r"], param["x_init"], n)
+    return trajs
 
-def plot_time_series(xs, delayed_logistic_params, separate_subplots = False):
+def plot_time_series(delayed_logistic_params, n, separate_subplots = False):
     """
+    List[Dict{delay:, r:, x_init:}] -> plot
     Plots trajectories across time
     """
+    num_traj = len(delayed_logistic_params)
+    trajs = delayed_logistic_mult(delayed_logistic_params, n)
+
     if separate_subplots:
-        fig, axs = plt.subplots(len(xs), 1)
-        if len(xs) == 1:         # Make axs iterable even if only one trajectory
+        fig, axs = plt.subplots(num_traj, 1)
+        if num_traj == 1: # Make axs iterable even if only one trajectory
             axs = [axs]
         for i, ax in enumerate(axs):
-            ax.scatter(np.arange(500), xs[i, -500:], color='k', s = 5)
-            par = delayed_logistic_params[i]
-            ax.set_title(f"r={par['r']}, delay={par['delay']}, x0={par['x_init']}")
+            ax.scatter(np.arange(min(500, n)), trajs[i, -500:], color='k', s = 5) # plot last min(n, 500) points
+            param = delayed_logistic_params[i]
+            ax.set_title(f"r={param['r']}, delay={param['delay']}, x0={param['x_init']}")
             ax.set_xlabel("n")
             ax.set_ylabel("x_n")
         plt.tight_layout()
         plt.show()
     else:
         plt.figure()
-        for i, par in enumerate(delayed_logistic_params):
-            plt.scatter(np.arange(500), xs[i, -500:], s = 5,
-                        label=f"r={par['r']}, delay={par['delay']}, x0={par['x_init']}")
+        for i, param in enumerate(delayed_logistic_params):
+            plt.scatter(np.arange(min(500, n)), trajs[i, -500:], s = 5,
+                        label=f"r={param['r']}, delay={param['delay']}, x0={param['x_init']}")
         plt.xlabel("n")
         plt.ylabel("x_n")
         plt.title("Delayed logistic map trajectories")
         plt.legend()
         plt.show()
+    return trajs
 
-def plot_phase_space(xs, delayed_logistic_params, separate_subplots = True):
+def plot_phase_space(delayed_logistic_params, n, separate_subplots = True):
     """
-    Plot x_{n-t} vs. x_n as approx to phase space (inspired by Taken's theorem)
+    List[Dict{delay:, r:, x_init:}] -> plot
+    Plots x_{n-t} vs. x_n as approx to phase space (inspired by Taken's theorem)
+    WARNING: t chosen automatically as delay param here, maybe add functionality to choose later
     Want two var to not be too correlated (no info if t too small), nor completely uncorrelated (t too large)
     Pick where autocorrelation first crosses 1/e or drops significantly
-    WARNING: t chosen automatically as delay param here, maybe add functionality to choose later
     """
+    num_traj = len(delayed_logistic_params)
+    trajs = delayed_logistic_mult(delayed_logistic_params, n)
+
     if separate_subplots:
-        fig, axs = plt.subplots(len(xs), 1, figsize=(6, 4*len(xs)))
-        if len(xs) == 1:
+        fig, axs = plt.subplots(num_traj, 1, figsize=(6, 4*num_traj))
+        if num_traj == 1:
             axs = [axs]
         for i, ax in enumerate(axs):
-            par = delayed_logistic_params[i]
-            delay = int(par["delay"])
-            ax.plot(xs[i,-5000-delay:-delay], xs[i,-5000:], '.', markersize=1)
+            param = delayed_logistic_params[i]
+            delay = int(param["delay"])
+            ax.plot(trajs[i,-500-delay:-delay], trajs[i,-min(500, n-delay):], '.', markersize=1) # plot last min(n-delay, 500) points
             ax.set_xlabel(f"x_(n-{delay})")
             ax.set_ylabel("x_n")
-            ax.set_title(f"Phase-space: r={par['r']}, delay={delay}, x0={par['x_init']}")
+            ax.set_title(f"Phase-space: r={param['r']}, delay={delay}, x0={param['x_init']}")
         plt.tight_layout()
         plt.show()
     else:
         plt.figure(figsize=(6,6))
-        for i, par in enumerate(delayed_logistic_params):
-            delay = int(par["delay"])
-            plt.plot(xs[i, -5000-delay:-delay], xs[i, -5000:], '.', markersize=1, label=f"r={par['r']}, delay={delay}, x0={par['x_init']}")
+        for i, param in enumerate(delayed_logistic_params):
+            delay = int(param["delay"])
+            plt.plot(trajs[i,-500-delay:-delay], trajs[i,-min(500, n-delay):], '.', markersize=1, label=f"r={param['r']}, delay={delay}, x0={param['x_init']}")
         plt.xlabel(f"x_(n-delay)")
         plt.ylabel("x_n")
         plt.title("Phase-space reconstruction of delayed logistic map")
         plt.legend()
         plt.show()
+    return trajs
 
 
 if __name__ == '__main__':
@@ -103,10 +111,9 @@ if __name__ == '__main__':
         # {"r": 1.5, "delay": 1, "x_init": [0.1, 0.1]},
         # {"r": 1.5, "delay": 3, "x_init": [0.1, 0.1, .1, .1]}
     ]
-    xs = delayed_logistic_mult(delayed_logistic_params, n)
-    # plot_time_series(xs, delayed_logistic_params, False)
-    # plot_phase_space(xs, delayed_logistic_params, True)
+    # trajs = delayed_logistic_mult(delayed_logistic_params, n)
+    trajs = plot_time_series(delayed_logistic_params, n, False)
+    trajs = plot_phase_space(delayed_logistic_params, n, True)
 
-    print(xs[0])
-    print(xs[2])
+    print(trajs[0])
 
