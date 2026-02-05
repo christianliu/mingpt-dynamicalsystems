@@ -12,6 +12,8 @@ from torch.nn import functional as F
 
 import numpy as np
 import bisect
+import pandas as pd
+import time
 
 from mingpt.cts_model import ContinuousGPT
 from mingpt.trainer import Trainer
@@ -49,6 +51,7 @@ class DelayDataset(Dataset):
     Emits batches of floats
     data is List[np.array of shape (n,) or shape (n, input_dim)], of length num_traj
     get_item always returns x, y that are Float tensors with shape (n, input_dim), only time Float comes up
+    Note must be Float and not double because model weights are Floats not doubles
     """
 
     @staticmethod
@@ -128,8 +131,8 @@ if __name__ == '__main__':
     set_seed(config.system.seed) # util function sets seed for libraries
 
     ########## Construct the training dataset ##########
-    train_n = int(1e4)
-    test_n = int(250)
+    train_n = int(1e6)
+    test_n = int(1e4)
     train_params = [ # train on 2 paths of one equation
         {"r": 2.26, "delay": 1, "x_init": [0.1, 0.1]},
         {"r": 2.26, "delay": 1, "x_init": [0.1, 0.15]}
@@ -171,12 +174,21 @@ if __name__ == '__main__':
 
     # iteration callback
     top_score = float("inf") # define a global variable
+    training_logs = []
     def batch_end_callback(trainer):
         global top_score # tells whatever is calling this function to update the global
 
         if trainer.iter_num % 10 == 0:
             # print a train score for a single batch
             print(f"iter_dt {trainer.iter_dt * 1000:.2f}ms; iter {trainer.iter_num}: train loss {trainer.loss.item():.5f}")
+            entry = {
+                'iter': trainer.iter_num,
+                'loss': trainer.loss.item(),
+                'top_score': top_score,
+                'iter_time': trainer.iter_dt, # time for THIS iteration
+                'timestamp': time.time()      # wall clock time
+            }
+            training_logs.append(entry)
 
         if trainer.iter_num % 500 == 0:
             # print a score based on the average train and test score for several batches
@@ -195,6 +207,10 @@ if __name__ == '__main__':
                 torch.save(model.state_dict(), ckpt_path)
             # revert model to training mode
             model.train()
+            
+            # save the training log
+            df = pd.DataFrame(training_logs)
+            df.to_csv("training_log.csv", index=False)
 
     trainer.set_callback('on_batch_end', batch_end_callback)
 
