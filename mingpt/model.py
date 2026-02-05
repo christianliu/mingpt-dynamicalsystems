@@ -150,7 +150,7 @@ class GPT(nn.Module):
                 'gpt-mini':     dict(n_layer=6, n_head=6, n_embd=192),
                 'gpt-micro':    dict(n_layer=4, n_head=4, n_embd=128),
                 'gpt-nano':     dict(n_layer=3, n_head=3, n_embd=48),
-            }[config.model_type]) #inputs the nested dict of 3 params to merge_from_dict
+            }[config.model_type]) # inputs the nested dict of 3 params to merge_from_dict
 
         self.transformer = nn.ModuleDict(dict(
             wte = nn.Embedding(config.vocab_size, config.n_embd), # token embedding
@@ -272,9 +272,9 @@ class GPT(nn.Module):
         device = idx.device
         b, t = idx.size()
         assert t <= self.block_size, f"Cannot forward sequence of length {t}, block size is only {self.block_size}"
-        pos = torch.arange(0, t, dtype=torch.long, device=device).unsqueeze(0) # shape (1, t)
-
+        
         # forward the GPT model itself
+        pos = torch.arange(0, t, dtype=torch.long, device=device).unsqueeze(0) # shape (1, t)
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
         pos_emb = self.transformer.wpe(pos) # position embeddings of shape (1, t, n_embd)
         x = self.transformer.drop(tok_emb + pos_emb)

@@ -11,7 +11,7 @@ from mingpt.model import BlockOutput, Block
 
 class ContinuousGPT(nn.Module):
     """
-    GPT Language Model
+    GPT Float Model
     Tensor -> BlockOutput, att_scores.shape = (B, num_layers, nh, T, T)
     """
 
@@ -36,6 +36,7 @@ class ContinuousGPT(nn.Module):
         super().__init__()
         assert config.input_dim is not None
         assert config.block_size is not None
+        self.input_dim = config.input_dim
         self.block_size = config.block_size
 
         # set n_layer, n_head, n_embd
@@ -60,17 +61,17 @@ class ContinuousGPT(nn.Module):
                 'gpt-mini':     dict(n_layer=6, n_head=6, n_embd=192),
                 'gpt-micro':    dict(n_layer=4, n_head=4, n_embd=128),
                 'gpt-nano':     dict(n_layer=3, n_head=3, n_embd=48),
-            }[config.model_type]) #inputs the nested dict of 3 params to merge_from_dict
+            }[config.model_type]) # inputs the nested dict of 3 params to merge_from_dict
         
         self.transformer = nn.ModuleDict(dict(
-            wte = nn.Linear(config.input_dim, config.n_embd), # token embedding
+            wte = nn.Linear(self.input_dim, config.n_embd), # token embedding
             wpe = nn.Embedding(config.block_size, config.n_embd), # positional embedding
             drop = nn.Dropout(config.embd_pdrop),
             h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
             ln_f = nn.LayerNorm(config.n_embd),
         ))
         # Head outputs Mean and Log-Variance (for stability)
-        self.regr_head = nn.Linear(config.n_embd, config.input_dim * 2) # use bias so can have nonzero predictions when input 0
+        self.regr_head = nn.Linear(config.n_embd, self.input_dim * 2) # use bias so can have nonzero predictions when input 0
 
         # init all weights, and apply a special scaled init to the residual projections, per GPT-2 paper
         self.apply(self._init_weights)
@@ -79,7 +80,7 @@ class ContinuousGPT(nn.Module):
                 torch.nn.init.normal_(p, mean=0.0, std=0.02/math.sqrt(2 * config.n_layer))
         with torch.no_grad():
             self.regr_head.weight.normal_(std=0.001) # since predicting log variance, sensitive to large weights
-            self.regr_head.bias[:config.input_dim].fill_(0) # !!!!! initialize where you expect mean path to be
+            self.regr_head.bias[:self.input_dim].fill_(0) # !!!!! initialize where you expect mean path to be
 
         # report number of params, including regr_head
         n_params = sum(p.numel() for p in self.parameters())
@@ -143,16 +144,17 @@ class ContinuousGPT(nn.Module):
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
         return optimizer
 
-    # targets of shape (B, H, input_dim)
+    # x, targets of shape (b, t <= block_size, input_dim)
     def forward(self, x, targets=None, output_att_scores=False): # returns mu, sigma for next prediction
         device = x.device
-        b, t = x.size()
+        b, t, x_input_dim = x.size()
+        assert x_input_dim == self.input_dim, f"Cannot forward sequence of input dimension {x_input_dim}, model is for dimension {self.input_dim}"
         assert t <= self.block_size, f"Cannot forward sequence of length {t}, block size is only {self.block_size}"
-        pos = torch.arange(0, t, dtype=torch.long, device=device).unsqueeze(0) # shape (1, t)
-
+        
         # forward the GPT model itself
-        tok_emb = self.transformer.wte(x) # token embeddings of shape (b, t, n_embd)
-        pos_emb = self.transformer.wpe(pos) # position embeddings of shape (1, t, n_embd)
+        pos = torch.arange(0, t, dtype=torch.long, device=device).unsqueeze(0) # same shape (1, t) and data type (long) as for discrete values, this is expected input into nn.Embedding to account for discrete time index
+        tok_emb = self.transformer.wte(x) # (b, t <= block_size, input_dim) -> (b, t, n_embd)
+        pos_emb = self.transformer.wpe(pos) # (1, t) -> (1, t, n_embd)
         x = self.transformer.drop(tok_emb + pos_emb)
         att_scores_mult = [] if output_att_scores else None
         for block in self.transformer.h:
@@ -164,7 +166,7 @@ class ContinuousGPT(nn.Module):
             att_scores_mult = torch.stack(att_scores_mult, dim=1)            
         x = self.transformer.ln_f(x)
         dist_params = self.regr_head(x)
-        mu, log_var = torch.chunk(dist_params, 2, dim=-1) # each of dim (B, H, input_dim)
+        mu, log_var = torch.chunk(dist_params, 2, dim=-1) # each of shape (b, t, input_dim)
         
         # if we are given some desired targets also calculate the loss
         loss = None
@@ -187,15 +189,15 @@ class ContinuousGPT(nn.Module):
         att_scores = None
         for i in range(max_new_tokens):
             # if the sequence context is growing too long we must crop it at block_size
-            x_cond = x if x.size(1) <= self.block_size else x[:, -self.block_size:]
-            # forward the model to get the logits for the index in the sequence
+            x_cond = x if x.size(1) <= self.block_size else x[:, -self.block_size:, :]
+            # forward the model to get the params for the index in the sequence
             if output_att_scores and i == max_new_tokens - 1:
                 output = self(x_cond, output_att_scores = True)
                 att_scores = output.att_scores
             else:
                 output = self(x_cond)
             mu, log_var = torch.chunk(output.y[:, -1, :], 2, dim=-1)
-            # scale by desired temperature and sample from the distribution
+            # sqrt(var) to get stdev, scale by desired temperature, and sample from the distribution
             std = torch.exp(0.5 * log_var) * temperature
             x_next = torch.normal(mu, std).unsqueeze(1) # (b, input_dim) -> (b, 1, input_dim)
             # append sampled index to the running sequence and continue
