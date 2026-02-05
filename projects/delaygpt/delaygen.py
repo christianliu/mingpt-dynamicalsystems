@@ -1,3 +1,5 @@
+import os
+
 import torch
 import numpy as np
 
@@ -13,7 +15,8 @@ if __name__ == '__main__':
     # ]
     
     # get trained model
-    delay_model = load_gpt_from_dir("out/delaygpt", cts_model=True)
+    work_dir = "out/delaygpt"
+    delay_model = load_gpt_from_dir(work_dir, cts_model=True)
     block_size = delay_model.block_size
 
     # get traj of trained model and truth for 2 trajectories
@@ -29,6 +32,7 @@ if __name__ == '__main__':
     model_output = delay_model.generate(model_input, compare_n - block_size).y
     # tensor of shape (num_traj, block_size, 1) -> List[List of len n] -> List[np.array of shape (n,)]
     model_trajs = [np.array(x) for x in model_output.squeeze(2).tolist()]
+    np.savez(os.path.join(work_dir, "model_output.npz"), model_trajs)
 
     # plot
     trajs = true_trajs + model_trajs
@@ -37,5 +41,7 @@ if __name__ == '__main__':
     shifts = [param["delay"] for param in test_params]
     shifts *= 2
 
-    plot_time_series(trajs, labels, False)
-    plot_phase_space(trajs, labels, shifts, False)
+    time_series = plot_time_series(trajs, labels, False)
+    time_series.savefig(os.path.join(work_dir, "time_series.png"))
+    phase_space = plot_phase_space(trajs, labels, shifts, False)
+    phase_space.savefig(os.path.join(work_dir, "phase_space.png"))

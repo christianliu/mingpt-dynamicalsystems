@@ -210,7 +210,7 @@ if __name__ == '__main__':
             
             # save the training log
             df = pd.DataFrame(training_logs)
-            df.to_csv("training_log.csv", index=False)
+            df.to_csv(os.path.join(config.system.work_dir, "training_log.csv"), index=False)
 
     trainer.set_callback('on_batch_end', batch_end_callback)
 

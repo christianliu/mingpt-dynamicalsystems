@@ -53,7 +53,7 @@ def plot_time_series(trajs, labels, separate_subplots = False):
         plt.tight_layout()
         plt.show()
     else:
-        plt.figure()
+        fig = plt.figure()
         for i in range(num_traj):
             # plt.scatter(np.arange(min(500, n)), trajs[i][-500:], s = 5, label=labels[i])
             plt.plot(np.arange(min(500, n)), trajs[i][-500:], label=labels[i])
@@ -62,6 +62,7 @@ def plot_time_series(trajs, labels, separate_subplots = False):
         plt.title("Delayed logistic map trajectories")
         plt.legend()
         plt.show()
+    return fig
 
 def plot_phase_space(trajs, labels, shifts, separate_subplots = True):
     """
@@ -87,7 +88,7 @@ def plot_phase_space(trajs, labels, shifts, separate_subplots = True):
         plt.tight_layout()
         plt.show()
     else:
-        plt.figure(figsize=(6,6))
+        fig = plt.figure(figsize=(6,6))
         for i in range(num_traj):
             shift = shifts[i]
             plt.plot(trajs[i][-500-shift:-shift], trajs[i][-min(500, n-shift):], '.', markersize=1, label=labels[i])
@@ -96,7 +97,7 @@ def plot_phase_space(trajs, labels, shifts, separate_subplots = True):
         plt.title("Phase-space reconstruction of delayed logistic map")
         plt.legend()
         plt.show()
-
+    return fig
 
 if __name__ == '__main__':
     n = int(100)
