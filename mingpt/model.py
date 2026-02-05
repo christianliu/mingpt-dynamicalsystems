@@ -267,7 +267,7 @@ class GPT(nn.Module):
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
         return optimizer
 
-    # targets of shape (B, H)
+    # x, targets of shape (b, t)
     def forward(self, idx, targets=None, output_att_scores=False): # returns logits of next prediction
         device = idx.device
         b, t = idx.size()

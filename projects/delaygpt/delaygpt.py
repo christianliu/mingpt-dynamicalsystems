@@ -117,6 +117,9 @@ class DelayDataset(Dataset):
     # make model
     # make trainer
     # done changing config, log and print config
+    # ***unexpected behavior now: log and print config before making model so 
+    # model doesn't fill in params from model_type when logging config, will cause errors in logic
+    # when making another model from the config, since only allowed to have model type or params filled in (XOR)
 
 if __name__ == '__main__':
     config = get_config()
@@ -144,13 +147,12 @@ if __name__ == '__main__':
     ########## Construct the model #####################
     config.model.input_dim = train_dataset.get_input_dim()
     config.model.block_size = train_dataset.get_block_size()
-    
+    print(config)
+    setup_logging(config)
     model = ContinuousGPT(config.model)
 
     ########## Construct the trainer object ############
     trainer = Trainer(config.trainer, model, train_dataset)
-    print(config)
-    setup_logging(config)
 
     # helper function for iteration callback
     # dataset -> list containing a loss for each batch of data -> average of these losses
