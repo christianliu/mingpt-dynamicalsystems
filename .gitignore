@@ -5,3 +5,4 @@ env/
 .pylintrc
 .DS_Store
 out/
+saved params/

@@ -134,12 +134,16 @@ if __name__ == '__main__':
     train_n = int(1e6)
     test_n = int(1e4)
     train_params = [ # train on 2 paths of one equation
-        {"r": 2.26, "delay": 1, "x_init": [0.1, 0.1]},
-        {"r": 2.26, "delay": 1, "x_init": [0.1, 0.15]}
+        # {"r": 2.26, "delay": 1, "x_init": [0.1, 0.1]},
+        # {"r": 2.26, "delay": 1, "x_init": [0.1, 0.15]},
+        {"r": 1.46, "delay": 3, "x_init": [0.05, 0.05, 0.05, 0.05]},
+        {"r": 1.46, "delay": 3, "x_init": [0.1, 0.2, 0.1, 0.2]}
     ]
     test_params = [ # test on 2 paths of same equation
-        {"r": 2.26, "delay": 1, "x_init": [0.1, 0.2]},
-        {"r": 2.26, "delay": 1, "x_init": [0.1, 0.175]}
+    #     {"r": 2.26, "delay": 1, "x_init": [0.1, 0.2]},
+    #     {"r": 2.26, "delay": 1, "x_init": [0.1, 0.175]},
+        {"r": 1.46, "delay": 3, "x_init": [0.1, 0.15, 0.1, 0.15]},
+        {"r": 1.46, "delay": 3, "x_init": [0.2, 0.2, 0.2, 0.2]}
     ]
     train_trajs = delayed_logistic_mult(train_params, train_n) # fn: List[Dict{delay:, r:, x_init:}] -> List[np.array of shape (n,)]
     test_trajs = delayed_logistic_mult(test_params, test_n)

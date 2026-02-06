@@ -102,9 +102,10 @@ def plot_phase_space(trajs, labels, shifts, separate_subplots = True):
 if __name__ == '__main__':
     n = int(100)
     delayed_logistic_params = [
-        {"r": 2.26, "delay": 1, "x_init": [0.1, 0.1]},
-        {"r": 2.26, "delay": 1, "x_init": [0.1, 0.15]},
-        {"r": 2.26, "delay": 1, "x_init": [0.1, 0.2]}
+        {"r": 1.46, "delay": 3, "x_init": [0.05, 0.05, 0.05, 0.05]},
+        {"r": 1.46, "delay": 3, "x_init": [0.1, 0.2, 0.1, 0.2]},
+        {"r": 1.46, "delay": 3, "x_init": [0.1, 0.15, 0.1, 0.15]},
+        {"r": 1.46, "delay": 3, "x_init": [0.2, 0.2, 0.2, 0.2]}
         # {"r": 2.2, "delay": 1, "x_init": [0.1, 0.1]},
         # {"r": 1.5, "delay": 1, "x_init": [0.1, 0.1]},
         # {"r": 1.5, "delay": 3, "x_init": [0.1, 0.1, .1, .1]}

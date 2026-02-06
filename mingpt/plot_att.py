@@ -8,7 +8,7 @@ import torch
 from mingpt.model import GPT
 from mingpt.cts_model import ContinuousGPT
 
-def plot_att(att_scores, tokens=None, figsize_scale=2.5):
+def plot_att(att_scores, tokens=None, max_layers=None, figsize_scale=2.5):
     """
     Plot attention scores in grid, row = layer, col = head
     att_scores: torch.Tensor of shape (n_layer, n_head, T, T) (note model outputs size (B, n_layer, n_head, T, T))
@@ -19,6 +19,8 @@ def plot_att(att_scores, tokens=None, figsize_scale=2.5):
     n_layer, n_head, T, _ = att_scores.shape
     if tokens is not None:
         assert T == len(tokens), f"Number of labels {len(tokens)} does not match size of attention scores {T}"
+    if max_layers is not None:
+        n_layer = min(max_layers, n_layer)
 
     fig, axes = plt.subplots(
         n_layer,
@@ -79,7 +81,7 @@ def load_gpt_from_dir(work_dir, cts_model=False, map_location="cpu"):
     model.eval()
     return model
 
-def plot_att_from_input(model, input, tokens=None):
+def plot_att_from_input(model, input, tokens=None, max_layers=None):
     """
     Takes in model and input tensor (of the shape expected by forward fn w/o batch, on the same device)
     Returns tensor containing input with next prediction
@@ -90,7 +92,7 @@ def plot_att_from_input(model, input, tokens=None):
     model.eval()
     output = model.generate(input.unsqueeze(0), 1, output_att_scores = True) # add batch dim to input to model
     print(tokens)
-    plot_att(output.att_scores[0], tokens=tokens) # remove batch dim from output
+    plot_att(output.att_scores[0], tokens=tokens, max_layers=max_layers) # remove batch dim from output
     return output.y[0]
 
 
