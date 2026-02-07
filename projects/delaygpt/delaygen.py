@@ -50,12 +50,12 @@ if __name__ == '__main__':
     shifts = [param["delay"] for param in test_params]
     shifts *= 2
 
-    time_series = plot_time_series(trajs[5:7] + trajs[12:], labels[5:7] + labels[12:], False)
-    phase_space = plot_phase_space(trajs[5:7] + trajs[12:], labels[5:7] + labels[12:], shifts[5:7] + shifts[12:], False)
+    # time_series = plot_time_series(trajs[5:7] + trajs[12:], labels[5:7] + labels[12:], False)
+    # phase_space = plot_phase_space(trajs[5:7] + trajs[12:], labels[5:7] + labels[12:], shifts[5:7] + shifts[12:], False)
 
     for input in [
-        true_trajs[1][0:80].astype(np.float32),
-        true_trajs[4][0:80].astype(np.float32) 
+        # true_trajs[5][0:40].astype(np.float32),
+        true_trajs[4][0:40].astype(np.float32) 
     ]:
         delay_input = torch.tensor(input).unsqueeze(1) # shape (t, input_dim)
         delay_tokens = [f"{x:.3f}" for x in input]

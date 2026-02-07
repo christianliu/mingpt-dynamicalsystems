@@ -53,6 +53,56 @@ def plot_att(att_scores, tokens=None, max_layers=None, figsize_scale=2.5):
     fig.colorbar(im, ax=axes, fraction=0.015, pad=0.02).set_label("Attention Weight")
     plt.show()
 
+def plot_att_bar(att_scores, thresholds=[.2, .3, .4, .8], max_layers=None, figsize_scale=2.5):
+    """
+    Plot bar plot of attention scores in grid, row = layer, col = head
+    For each diagonal, show % of params above certain thresholds
+    thresholds: List[String labels]
+    att_scores: torch.Tensor of shape (n_layer, n_head, T, T) (note model outputs size (B, n_layer, n_head, T, T))
+    """
+    
+    att_scores = att_scores.cpu().numpy() # (n_layer, n_head, T, T)
+    n_layer, n_head, T, _ = att_scores.shape
+    if max_layers is not None:
+        n_layer = min(max_layers, n_layer)
+
+    fig, axes = plt.subplots(
+        n_layer,
+        n_head,
+        figsize=(figsize_scale * n_head, figsize_scale * n_layer),
+        squeeze=False,
+        constrained_layout=True
+    )
+
+    thresholds.sort()
+    colors = plt.cm.viridis(np.linspace(0, 1, len(thresholds)))
+    for l in range(n_layer):git
+        for h in range(n_head):
+            ax = axes[l, h]
+            
+            att_matrix = att_scores[l,h]
+            att_matrix_diags = [att_matrix.diagonal(-i) for i in range(T)] # get list of diagonals
+            for i, thresh in enumerate(thresholds):
+                scores_per_diag = [np.sum(d > thresh) / len(d) for d in att_matrix_diags]
+                ax.bar(range(T), scores_per_diag, label=f">{thresh}", color=colors[i])
+
+            ax.set_ylim(0, .8) # Percentages are 0-1
+            ax.set_xticks(range(T))
+            ax.set_xticklabels([str(i) if i % 5 == 0 else "" for i in range(T)])
+            if l == 0:
+                ax.set_title(f"Head {h}", fontsize=10)
+            if h == 0:
+                ax.set_ylabel(f"Layer {l}", fontsize=10)
+            if l == n_layer-1:
+                ax.set_xlabel("Offset from main diagonal")
+
+    # global legend
+    leg_ax = fig.add_axes([0.92, 0.2, 0.05, 0.6]) 
+    leg_ax.axis('off') # Hide the axis lines
+    handles, labels = axes[0,0].get_legend_handles_labels()
+    leg_ax.legend(handles, labels, loc='center left', title="Thresholds")
+    plt.show()
+
 def load_gpt_from_dir(work_dir, cts_model=False, map_location="cpu"):
     """
     String (path to dir containing config.json and model.pt of model config and model params) -> 
@@ -93,6 +143,7 @@ def plot_att_from_input(model, input, tokens=None, max_layers=None):
     output = model.generate(input.unsqueeze(0), 1, output_att_scores = True) # add batch dim to input to model
     print(tokens)
     plot_att(output.att_scores[0], tokens=tokens, max_layers=max_layers) # remove batch dim from output
+    plot_att_bar(output.att_scores[0], max_layers=max_layers)
     return output.y[0]
 
 
@@ -123,8 +174,8 @@ if __name__ == '__main__':
     for input in [
         [0.01435208, 0.01408787, 0.03138163, 0.06992334, 0.15306761, 0.32174402,
                 0.61583967, 0.94399509], #9057, train example
-        [0.98396119, 0.46809989, 0.01696755, 0.0203966,  0.04531416, 0.10032119,
-               0.216452,  0.44010625] #19872, test example
+        # [0.98396119, 0.46809989, 0.01696755, 0.0203966,  0.04531416, 0.10032119,
+        #        0.216452,  0.44010625] #19872, test example
     ]:
         delay_input = torch.tensor(input).unsqueeze(1) # shape (t, input_dim)
         delay_tokens = [f"{x:.3f}" for x in input]
