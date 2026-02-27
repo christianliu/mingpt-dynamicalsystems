@@ -36,7 +36,10 @@ def get_config():
 
     # model
     C.model = ContinuousGPT.get_default_config()
-    C.model.model_type = 'gpt-mini'
+    C.model.model_type = None
+    C.model.n_layer = 1
+    C.model.n_head = 6
+    C.model.n_embd =  192
 
     # trainer
     C.trainer = Trainer.get_default_config()
@@ -179,6 +182,7 @@ if __name__ == '__main__':
     # iteration callback
     top_score = float("inf") # define a global variable
     training_logs = []
+    train_test_logs = []
     def batch_end_callback(trainer):
         global top_score # tells whatever is calling this function to update the global
 
@@ -203,6 +207,13 @@ if __name__ == '__main__':
             print(f"Train final score: avg loss = {train_score:.4f}")
             print(f"Test final score: avg loss = {test_score:.4f}")
             score = train_score + test_score
+            entry = {
+                'iter': trainer.iter_num,
+                'train_score': train_score,
+                'test_score': test_score
+            }
+            train_test_logs.append(entry)
+
             # save the model if this is the best score we've seen so far
             if score < top_score:
                 top_score = score
@@ -215,6 +226,8 @@ if __name__ == '__main__':
             # save the training log
             df = pd.DataFrame(training_logs)
             df.to_csv(os.path.join(config.system.work_dir, "training_log.csv"), index=False)
+            df = pd.DataFrame(train_test_logs)
+            df.to_csv(os.path.join(config.system.work_dir, "train_test_log.csv"), index=False)
 
     trainer.set_callback('on_batch_end', batch_end_callback)
 
