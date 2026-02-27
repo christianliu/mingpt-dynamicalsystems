@@ -9,7 +9,7 @@ from helpers.delaydiff import delayed_logistic_mult, plot_time_series, plot_phas
 if __name__ == '__main__':
 
     # get trained model
-    work_dir = "saved params/run-2" # "out/delaygpt"
+    work_dir = "saved params/run-4" # "out/delaygpt"
     delay_model_1 = load_gpt_from_dir(work_dir, cts_model=True)
     block_size = delay_model_1.block_size
 
@@ -39,16 +39,16 @@ if __name__ == '__main__':
     # np.savez(os.path.join(work_dir, "model_output.npz"), model_trajs)
     ##########################################################################################
 
-    with np.load(os.path.join(work_dir, "model_output.npz")) as file_data:
-        model_trajs = file_data['arr_0']
-    model_trajs = [model_trajs[i] for i in range(model_trajs.shape[0])]
+    # with np.load(os.path.join(work_dir, "model_output.npz")) as file_data:
+    #     model_trajs = file_data['arr_0']
+    # model_trajs = [model_trajs[i] for i in range(model_trajs.shape[0])]
 
-    # plot
-    trajs = true_trajs + model_trajs
-    labels = ([f"True r={param['r']}, delay={param['delay']}, x0={param['x_init']}" for param in test_params] 
-    + [f"Model r={param['r']}, delay={param['delay']}, x0={param['x_init']}" for param in test_params])
-    shifts = [param["delay"] for param in test_params]
-    shifts *= 2
+    # # plot
+    # trajs = true_trajs + model_trajs
+    # labels = ([f"True r={param['r']}, delay={param['delay']}, x0={param['x_init']}" for param in test_params] 
+    # + [f"Model r={param['r']}, delay={param['delay']}, x0={param['x_init']}" for param in test_params])
+    # shifts = [param["delay"] for param in test_params]
+    # shifts *= 2
 
     # time_series = plot_time_series(trajs[5:7] + trajs[12:], labels[5:7] + labels[12:], False)
     # phase_space = plot_phase_space(trajs[5:7] + trajs[12:], labels[5:7] + labels[12:], shifts[5:7] + shifts[12:], False)

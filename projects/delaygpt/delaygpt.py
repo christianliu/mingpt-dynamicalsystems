@@ -37,7 +37,7 @@ def get_config():
     # model
     C.model = ContinuousGPT.get_default_config()
     C.model.model_type = None
-    C.model.n_layer = 1
+    C.model.n_layer = 6
     C.model.n_head = 6
     C.model.n_embd =  192
 

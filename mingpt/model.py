@@ -76,7 +76,7 @@ class CausalSelfAttention(nn.Module):
 
 class Block(nn.Module):
     """
-    Transformer block combining self-attention, FFN, layer norm
+    Transformer block combining self-attention, FFN (with ), layer norm
     Tensor -> BlockOutput, att_scores.shape = (B, nh, T, T)
     """
     def __init__(self, config):
@@ -98,6 +98,55 @@ class Block(nn.Module):
         x = x + output.y
         x = x + self.mlpf(self.ln_2(x))
         return BlockOutput(x, output.att_scores)
+    
+
+class Block2HiddenLayers(nn.Module):
+    """
+    Transformer block combining self-attention, FFN (with ), layer norm
+    Tensor -> BlockOutput, att_scores.shape = (B, nh, T, T)
+    """
+    def __init__(self, config):
+        super().__init__()
+        self.ln_1 = nn.LayerNorm(config.n_embd)
+        self.attn = CausalSelfAttention(config)
+        self.ln_2 = nn.LayerNorm(config.n_embd)
+        self.mlp = nn.ModuleDict(dict(
+            c_fc1    = nn.Linear(config.n_embd, 4 * config.n_embd),
+            c_fc2    = nn.Linear(4 * config.n_embd, 4 * config.n_embd),
+            c_proj  = nn.Linear(4 * config.n_embd, config.n_embd),
+            act     = NewGELU(),
+            dropout = nn.Dropout(config.resid_pdrop),
+        ))
+        m = self.mlp
+        self.mlpf = lambda x: m.dropout(m.c_proj(m.act(m.c_fc2(m.act(m.c_fc1(x)))))) # MLP forward
+
+    def forward(self, x, output_att_scores=False):
+        output = self.attn(self.ln_1(x), output_att_scores)
+        x = x + output.y
+        x = x + self.mlpf(self.ln_2(x))
+        return BlockOutput(x, output.att_scores)
+    
+class Block2HiddenLayersNoSelfAtt(nn.Module):
+    """
+    Transformer block combining self-attention, FFN (with ), layer norm
+    Tensor -> BlockOutput, att_scores.shape = (B, nh, T, T)
+    """
+    def __init__(self, config):
+        super().__init__()
+        self.ln = nn.LayerNorm(config.n_embd)
+        self.mlp = nn.ModuleDict(dict(
+            c_fc1    = nn.Linear(config.n_embd, 4 * config.n_embd),
+            c_fc2    = nn.Linear(4 * config.n_embd, 4 * config.n_embd),
+            c_proj  = nn.Linear(4 * config.n_embd, config.n_embd),
+            act     = NewGELU(),
+            dropout = nn.Dropout(config.resid_pdrop),
+        ))
+        m = self.mlp
+        self.mlpf = lambda x: m.dropout(m.c_proj(m.act(m.c_fc2(m.act(m.c_fc1(x)))))) # MLP forward
+
+    def forward(self, x, output_att_scores=False):
+        x = x + self.mlpf(self.ln(x))
+        return BlockOutput(x, None)
 
 class GPT(nn.Module):
     """
