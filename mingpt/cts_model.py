@@ -5,7 +5,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 from mingpt.utils import CfgNode as CN
-from mingpt.model import BlockOutput, Block
+from mingpt.model import BlockOutput, Block, Block2HiddenLayers, Block2HiddenLayersNoSelfAtt
 
 # -----------------------------------------------------------------------------
 
@@ -67,7 +67,7 @@ class ContinuousGPT(nn.Module):
             wte = nn.Linear(self.input_dim, config.n_embd), # token embedding
             wpe = nn.Embedding(config.block_size, config.n_embd), # positional embedding
             drop = nn.Dropout(config.embd_pdrop),
-            h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
+            h = nn.ModuleList([Block2HiddenLayersNoSelfAtt(config) for _ in range(config.n_layer)]),
             ln_f = nn.LayerNorm(config.n_embd),
         ))
         # Head outputs Mean and Log-Variance (for stability)
