@@ -27,8 +27,10 @@ The first layer of attentions scores, calculated when asking the model to predic
 ![tau1-scores](tau1-scores.png)
 
 The model's generated output, compared to a true path, is given in the next two figures:
-![run1-3](run1-3.png)
-![run1-4](run1-4.png)
+<!-- ![run1-3](run1-3.png) -->
+<img src="./run1-3.png" height="48">
+<!-- ![run1-4](run1-4.png) -->
+<img src="./run1-4.png" height="48">
 
 Qualitatively, the model does a good job with predicting the trajectory of a path. We can see higher attention scores at bands off the diagonal, as we predicted, but not exactly at the offset of our delay parameter. To better see at what offsets the attention scores light up, the following bar graph counts the number of parameters on each off-diagonal with scores reaching a certain threshold:
 ![tau1-scores-bar](tau1-scores-bar.png)
@@ -37,8 +39,8 @@ Qualitatively, the model does a good job with predicting the trajectory of a pat
 The transformer was trained on two trajectories in $\mathbb{R}$ of length $10^6$ following the delay logistic equation with a delay of 3 and initial two states $(0.05, 0.05, 0.05, 0.05)$ and $(0.1, 0.2, 0.1, 0.2)$. In training, the test trajectories used were two paths of length $10^4$ following the same equation with initial two states $(0.1, 0.15, 0.1, 0.15)$ and $(0.2, 0.2, 0.2, 0.2)$. The transformer was trained for 43,000 iterations.
 
 The attentions scores are here:
-![tau2-scores](tau2-scores.png)
-![tau2-scores-bar](tau2-scores-bar.png)
+![tau3-scores](tau3-scores.png)
+![tau3-scores-bar](tau3-scores-bar.png)
 
 The model did a poor job of extrapolating learnings from the delayed logistic map with delay parameter 3 to trajectories with delay parameter 1, as shown below, even though the structure of the equation is otherwise the same.
 ![run2-3](run2-3.png)
