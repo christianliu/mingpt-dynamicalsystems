@@ -26,9 +26,9 @@ The transformer was trained on two trajectories in $\mathbb{R}$ of length $10^6$
 The first layer of attentions scores, calculated when asking the model to predict the next value of a sequence obtained from the true model (the sequence are the labels on both axes below), are plotted below. Only a subset of the full training block size of 128 is shown, for readibility, but the remaining scores follow the same pattern.
 
 <!-- ![tau1-scores](tau1-scores.png) -->
-| |
-| --- |
-| <img src="./tau1-scores.png"> |
+<div style="overflow-x: auto; white-space: nowrap;">
+    <img src="./tau1-scores.png">
+</div>
 
 The model's generated output, compared to a true path, is given in the next two figures:
 
@@ -40,9 +40,9 @@ The model's generated output, compared to a true path, is given in the next two 
 Qualitatively, the model does a good job with predicting the trajectory of a path. We can see higher attention scores at bands off the diagonal, as we predicted, but not exactly at the offset of our delay parameter. To better see at what offsets the attention scores light up, the following bar graph counts the number of parameters on each off-diagonal with scores reaching a certain threshold:
 
 <!-- ![tau1-scores-bar](tau1-scores-bar.png) -->
-| |
-| --- |
-| <img src="./tau1-scores-bar.png"> |
+<div style="overflow-x: auto; white-space: nowrap;">
+    <img src="./tau1-scores-bar.png">
+</div>
 
 **Run 2**:
 The transformer was trained on two trajectories in $\mathbb{R}$ of length $10^6$ following the delay logistic equation with a delay of 3 and initial two states $(0.05, 0.05, 0.05, 0.05)$ and $(0.1, 0.2, 0.1, 0.2)$. In training, the test trajectories used were two paths of length $10^4$ following the same equation with initial two states $(0.1, 0.15, 0.1, 0.15)$ and $(0.2, 0.2, 0.2, 0.2)$. The transformer was trained for 43,000 iterations.
@@ -50,13 +50,13 @@ The transformer was trained on two trajectories in $\mathbb{R}$ of length $10^6$
 The attentions scores are here:
 
 <!-- ![tau3-scores](tau3-scores.png) -->
-| |
-| --- |
-| <img src="./tau3-scores.png"> |
+<div style="overflow-x: auto; white-space: nowrap;">
+    <img src="./tau3-scores.png">
+</div>
 <!-- ![tau3-scores-bar](tau3-scores-bar.png) -->
-| |
-| --- |
-| <img src="./tau3-scores-bar.png" height="300"> |
+<div style="overflow-x: auto; white-space: nowrap;">
+    <img src="./tau3-scores-bar.png" height="300">
+</div>
 
 The model did a poor job of extrapolating learnings from the delayed logistic map with delay parameter 3 to trajectories with delay parameter 1, as shown below, even though the structure of the equation is otherwise the same.
 
